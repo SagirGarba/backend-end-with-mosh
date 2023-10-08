@@ -1,4 +1,4 @@
-import axios, {AxiosError} from "axios";
+import axios, { AxiosError, CanceledError } from "axios";
 import { useEffect, useState } from "react";
 
 // import { useEffect, useRef, useState } from "react";
@@ -15,28 +15,43 @@ interface User {
 const App = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState("");
+  const [isLoading, setLoading] = useState(false);
 
   useEffect(() => {
     //Using await and async
-    const fetchUsers = async () => {
-      const res = await axios.get<User[]>(
-        "https://jsonplaceholder.typicode.com/users"
-        
-      );
-      setUsers(res.data)
-    };
-    catch (error) {
-      setError((err as AxiosError).message);
-    }
+    // const fetchUsers = async () => {
+    //   try {
+    //     const res = await axios.get<User[]>(
+    //       "https://jsonplaceholder.typicode.com/users"
+    //     );
+    //     setUsers(res.data);
+    //   } catch (err) {
+    //     setError((err as AxiosError).message);
+    //   }
 
-    //Using promise to get data with then as response and catch to catch error
+    //   fetchUsers();
+
+    // Using promise to get data with then as response and catch to catch error
     // axios
-    //   .get<User[]>("https://jsonplaceholder.typicode.com/Xusers")
-    //   .then((res) => setUsers(res.data))
-    //   .catch((err) => {
-    //     setError(err.message);
-    //   });
+
+    const controller = new AbortController();
+
+    setLoading(true);
+    axios
+      .get<User[]>("https://jsonplaceholder.typicode.com/users", {
+        signal: controller.signal,
+      })
+      .then((res) => {
+        setUsers(res.data), setLoading(false);
+      })
+      .catch((err) => {
+        if (err instanceof CanceledError) return;
+        setError(err.message), setLoading(false);
+      });
+
+    return () => controller.abort();
   }, []);
+
   // const ref = useRef<HTMLInputElement>(null);
 
   // const [category, setCategory] = useState("");
@@ -51,12 +66,37 @@ const App = () => {
   //   return () => disconnect();
   // });
 
+  const deleteUser = (user: User) => {
+    const originalUsers = [...users];
+    setUsers(users.filter((u) => u.id !== user.id));
+
+    axios
+      .delete("https://jsonplaceholder.typicode.com/xusers/" + user.id)
+      .catch((err) => {
+        setError(err.message);
+        setUsers(originalUsers);
+      });
+  };
+
   return (
     <div>
       {error && <h1 className="text-danger">{error}</h1>}
-      <ul>
+
+      {isLoading && <div className="spinner-border"></div>}
+      <ul className="list-group">
         {users.map((user) => (
-          <li key={user.id}>{user.name}</li>
+          <li
+            key={user.id}
+            className="list-group-item d-flex justify-content-between"
+          >
+            {user.name}
+            <button
+              className="btn btn-outline-danger"
+              onClick={() => deleteUser(user)}
+            >
+              Delete
+            </button>{" "}
+          </li>
         ))}
       </ul>
 
